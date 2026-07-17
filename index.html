@@ -24,11 +24,15 @@
         .login-error { color: var(--error); font-size: 0.85rem; margin-top: -5px; margin-bottom: 15px; min-height: 1em; }
 
         .prehled-karta { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 20px; }
-        .prehled-karta.celkovy { border-color: var(--accent); }
         .prehled-hlavicka { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
         .prehled-jmeno { font-size: 1.15rem; font-weight: 800; color: #fff; }
         .prehled-osc { font-size: 0.8rem; color: #64748b; font-weight: 500; margin-left: 8px; }
         .bez-prumeru-tag { font-size: 0.72rem; color: var(--warning); background: rgba(234, 179, 8, 0.12); border: 1px solid var(--warning); padding: 3px 9px; border-radius: 20px; font-weight: 600; }
+
+        .den-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 18px; }
+        .den-summary-card { background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border); border-radius: 10px; padding: 12px; text-align: center; }
+        .den-summary-card .val { display: block; font-size: 1.3rem; font-weight: 800; color: var(--accent); }
+        .den-summary-card .lbl { display: block; font-size: 0.68rem; color: #94a3b8; text-transform: uppercase; margin-top: 3px; letter-spacing: 0.4px; }
 
         table.vykony-table { width: 100%; border-collapse: collapse; }
         table.vykony-table th, table.vykony-table td { padding: 10px 12px; text-align: center; border-bottom: 1px solid var(--border); font-size: 0.88rem; }
@@ -198,121 +202,86 @@
             return;
         }
 
-        // Celkový přehled za všechny osoby po dnech
-        const celkemPodleDnu = {};
+        app.innerHTML = `
+            <input type="text" class="search-box" id="hledej-pracovnika" placeholder="Hledat osobní číslo, jméno nebo datum..." oninput="filtrovatRadky()">
+            <div id="dny-wrap"></div>`;
+
+        // Seskupit záznamy podle dne, a v rámci dne podle osobního čísla (součet minut)
+        const podleDne = {}; // datum -> { osCislo -> {jmeno, minuty} }
         globalVykonyData.forEach(r => {
-            celkemPodleDnu[r.datum] = (celkemPodleDnu[r.datum] || 0) + r.minuty;
-        });
-        const celkemDny = Object.keys(celkemPodleDnu).sort();
-
-        let celkemRadky = '';
-        celkemDny.forEach(datumIso => {
-            const minuty = Math.round(celkemPodleDnu[datumIso]);
-            const hodiny = (minuty / 60).toFixed(1);
-            celkemRadky += `
-                <tr>
-                    <td>${formatDatumCZ(datumIso)}</td>
-                    <td>${minuty} min</td>
-                    <td>${hodiny} h</td>
-                </tr>`;
+            if (!podleDne[r.datum]) podleDne[r.datum] = {};
+            if (!podleDne[r.datum][r.osCislo]) podleDne[r.datum][r.osCislo] = { jmeno: r.jmeno, minuty: 0 };
+            podleDne[r.datum][r.osCislo].minuty += r.minuty;
+            if (!podleDne[r.datum][r.osCislo].jmeno && r.jmeno) podleDne[r.datum][r.osCislo].jmeno = r.jmeno;
         });
 
-        let html = `
-            <div class="prehled-karta celkovy">
-                <div class="prehled-hlavicka">
-                    <div class="prehled-jmeno">📊 Celkový přehled — všechny osoby</div>
-                </div>
-                <table class="vykony-table">
-                    <thead><tr><th>Datum</th><th>Celkem minut</th><th>Celkem hodin</th></tr></thead>
-                    <tbody>${celkemRadky}</tbody>
-                </table>
-            </div>
-            <input type="text" class="search-box" id="hledej-pracovnika" placeholder="Hledat osobní číslo nebo jméno..." oninput="filtrovatPracovniky()">
-            <div id="pracovnici-wrap"></div>`;
+        // Od nejaktuálnějšího data po nejstarší
+        const dny = Object.keys(podleDne).sort().reverse();
 
-        app.innerHTML = html;
-
-        // Sestavení seznamu pracovníků
-        const osoby = {}; // osCislo -> [zaznamy]
-        globalVykonyData.forEach(r => {
-            if (!osoby[r.osCislo]) osoby[r.osCislo] = [];
-            osoby[r.osCislo].push(r);
-        });
-
-        const cisla = Object.keys(osoby);
-        const sPrumerem = [];
-        const bezPrumeru = [];
-
-        cisla.forEach(cislo => {
-            const info = globalPrumery[cislo.toLowerCase()];
-            if (info && info.prumer !== null && info.prumer !== undefined) sPrumerem.push(cislo);
-            else bezPrumeru.push(cislo);
-        });
-
-        // Řazení podle jména (nebo osobního čísla, není-li jméno)
-        function jmenoProRazeni(cislo) {
-            const info = globalPrumery[cislo.toLowerCase()];
-            if (info && info.jmeno) return info.jmeno;
-            const zaznam = osoby[cislo][0];
-            return zaznam ? zaznam.jmeno : cislo;
-        }
-        sPrumerem.sort((a, b) => jmenoProRazeni(a).localeCompare(jmenoProRazeni(b), 'cs'));
-        bezPrumeru.sort((a, b) => jmenoProRazeni(a).localeCompare(jmenoProRazeni(b), 'cs'));
-
-        const serazenaCisla = [...sPrumerem, ...bezPrumeru];
-
-        const wrap = document.getElementById('pracovnici-wrap');
-        wrap.innerHTML = serazenaCisla.map(cislo => vykresliPracovnika(cislo, osoby[cislo])).join('');
+        const wrap = document.getElementById('dny-wrap');
+        wrap.innerHTML = dny.map(datumIso => vykresliDen(datumIso, podleDne[datumIso])).join('');
     }
 
-    function vykresliPracovnika(osCislo, zaznamy) {
-        const info = globalPrumery[osCislo.toLowerCase()];
-        const jmeno = (info && info.jmeno) ? info.jmeno : (zaznamy[0] ? zaznamy[0].jmeno : '');
-        const prumer = (info && info.prumer !== null && info.prumer !== undefined) ? info.prumer : null;
+    function vykresliDen(datumIso, pracovniciDne) {
+        const cisla = Object.keys(pracovniciDne);
 
-        // Součet minut po dnech pro tohoto pracovníka
-        const podleDnu = {};
-        zaznamy.forEach(r => {
-            podleDnu[r.datum] = (podleDnu[r.datum] || 0) + r.minuty;
-        });
-        const dny = Object.keys(podleDnu).sort();
+        const hodnoty = cisla.map(c => Math.round(pracovniciDne[c].minuty));
+        const celkemMinut = hodnoty.reduce((a, b) => a + b, 0);
+        const celkemHodin = (celkemMinut / 60).toFixed(1);
+        const minVykon = Math.min(...hodnoty);
+        const maxVykon = Math.max(...hodnoty);
+        const prumerDne = Math.round(celkemMinut / cisla.length);
+
+        // Seřadit pracovníky od nejvýkonnějšího po nejslabšího daný den
+        const serazenaCisla = cisla.slice().sort((a, b) => pracovniciDne[b].minuty - pracovniciDne[a].minuty);
 
         let radky = '';
-        dny.forEach(datumIso => {
-            const minuty = Math.round(podleDnu[datumIso]);
-            let prumerBunka = '<td class="prazdne">—</td>';
-            let rozdilBunka = '<td class="prazdne">—</td>';
+        serazenaCisla.forEach(osCislo => {
+            const zaznam = pracovniciDne[osCislo];
+            const minuty = Math.round(zaznam.minuty);
+            const info = globalPrumery[osCislo.toLowerCase()];
+            const jmeno = (info && info.jmeno) ? info.jmeno : (zaznam.jmeno || '');
+            const prumer = (info && info.prumer !== null && info.prumer !== undefined) ? info.prumer : null;
+            const podil = celkemMinut > 0 ? Math.round((minuty / celkemMinut) * 100) : 0;
 
+            let rozdilBunka = '<td class="prazdne">—</td>';
             if (prumer !== null) {
                 const rozdilProcento = Math.round(((minuty - prumer) / prumer) * 100);
                 const podPrumerem = rozdilProcento <= -10;
                 const znamenko = rozdilProcento > 0 ? '+' : '';
-                prumerBunka = `<td>${Math.round(prumer)} min</td>`;
                 rozdilBunka = `<td class="${podPrumerem ? 'pod-prumerem' : 'nad-prumerem'}">${znamenko}${rozdilProcento}%</td>`;
             }
 
             radky += `
-                <tr>
-                    <td>${formatDatumCZ(datumIso)}</td>
+                <tr data-hledat="${(osCislo + ' ' + jmeno + ' ' + formatDatumCZ(datumIso)).toLowerCase()}">
+                    <td style="text-align:left;">${jmeno || '(bez jména)'} <span class="prehled-osc">${osCislo}</span></td>
                     <td>${minuty} min</td>
-                    ${prumerBunka}
+                    <td>${prumer !== null ? Math.round(prumer) + ' min' : '<span class="prazdne">—</span>'}</td>
                     ${rozdilBunka}
+                    <td>${podil}%</td>
                 </tr>`;
         });
 
         return `
-            <div class="prehled-karta pracovnik-karta" data-hledat="${(osCislo + ' ' + jmeno).toLowerCase()}">
+            <div class="prehled-karta den-karta" data-den="${formatDatumCZ(datumIso).toLowerCase()}">
                 <div class="prehled-hlavicka">
-                    <div class="prehled-jmeno">👤 ${jmeno || '(bez jména)'} <span class="prehled-osc">${osCislo}</span></div>
-                    ${prumer === null ? '<span class="bez-prumeru-tag">bez průměru</span>' : ''}
+                    <div class="prehled-jmeno">📅 ${formatDatumCZ(datumIso)}</div>
+                </div>
+                <div class="den-summary">
+                    <div class="den-summary-card"><span class="val">${celkemMinut} min</span><span class="lbl">Celkem minut</span></div>
+                    <div class="den-summary-card"><span class="val">${celkemHodin} h</span><span class="lbl">Celkem hodin</span></div>
+                    <div class="den-summary-card"><span class="val">${minVykon} min</span><span class="lbl">Minimální výkon</span></div>
+                    <div class="den-summary-card"><span class="val">${maxVykon} min</span><span class="lbl">Maximální výkon</span></div>
+                    <div class="den-summary-card"><span class="val">${prumerDne} min</span><span class="lbl">Průměrný výkon dne</span></div>
                 </div>
                 <table class="vykony-table">
                     <thead>
                         <tr>
-                            <th>Datum</th>
+                            <th style="text-align:left;">Jméno</th>
                             <th>Odpracováno</th>
-                            <th>Průměr pracovníka</th>
+                            <th>Jejich průměr</th>
                             <th>Rozdíl oproti průměru</th>
+                            <th>Podíl na dni</th>
                         </tr>
                     </thead>
                     <tbody>${radky}</tbody>
@@ -320,11 +289,19 @@
             </div>`;
     }
 
-    function filtrovatPracovniky() {
+    function filtrovatRadky() {
         const dotaz = document.getElementById('hledej-pracovnika').value.trim().toLowerCase();
-        document.querySelectorAll('.pracovnik-karta').forEach(karta => {
-            const hledat = karta.getAttribute('data-hledat') || '';
-            karta.style.display = hledat.includes(dotaz) ? 'block' : 'none';
+        document.querySelectorAll('.den-karta').forEach(karta => {
+            const denText = karta.getAttribute('data-den') || '';
+            let shodaVDni = 0, celkemRadku = 0;
+            karta.querySelectorAll('tbody tr').forEach(tr => {
+                celkemRadku++;
+                const hledat = tr.getAttribute('data-hledat') || '';
+                const shoda = dotaz === '' || hledat.includes(dotaz) || denText.includes(dotaz);
+                tr.style.display = shoda ? '' : 'none';
+                if (shoda) shodaVDni++;
+            });
+            karta.style.display = (dotaz === '' || shodaVDni > 0 || denText.includes(dotaz)) ? 'block' : 'none';
         });
     }
 </script>
