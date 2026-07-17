@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Výkony obsluh TB</title>
+    <style>
+        :root {
+            --bg: #0f172a; --card: #1e293b; --accent: #38bdf8; --text: #f1f5f9; --success: #22c55e; --error: #ef4444; --warning: #eab308; --border: #334155;
+        }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; }
+
+        .status-msg { text-align: center; color: var(--accent); font-style: italic; margin-top: 20px; }
+        .msg { padding: 12px; border-radius: 6px; font-size: 0.9rem; font-weight: 500; line-height: 1.4; display: none; }
+        .msg.red { display: block; background: rgba(239, 68, 68, 0.15); border: 1px solid var(--error); color: #f87171; }
+
+        .login-box { max-width: 380px; margin: 60px auto; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 30px; text-align: center; }
+        .login-box h3 { margin-top: 0; color: var(--accent); }
+        .login-box input { width: 100%; background: #0f172a; border: 1px solid var(--border); padding: 14px; border-radius: 8px; color: white; margin-bottom: 15px; outline: none; box-sizing: border-box; font-size: 1rem; text-align: center; letter-spacing: 2px; }
+        .login-box input:focus { border-color: var(--accent); }
+        .login-box button { width: 100%; background: var(--accent); color: #000; font-weight: bold; border: none; padding: 14px; border-radius: 8px; cursor: pointer; font-size: 1rem; }
+        .login-box button:hover { opacity: 0.9; }
+        .login-error { color: var(--error); font-size: 0.85rem; margin-top: -5px; margin-bottom: 15px; min-height: 1em; }
+
+        .prehled-karta { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 20px; }
+        .prehled-karta.celkovy { border-color: var(--accent); }
+        .prehled-hlavicka { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+        .prehled-jmeno { font-size: 1.15rem; font-weight: 800; color: #fff; }
+        .prehled-osc { font-size: 0.8rem; color: #64748b; font-weight: 500; margin-left: 8px; }
+        .bez-prumeru-tag { font-size: 0.72rem; color: var(--warning); background: rgba(234, 179, 8, 0.12); border: 1px solid var(--warning); padding: 3px 9px; border-radius: 20px; font-weight: 600; }
+
+        table.vykony-table { width: 100%; border-collapse: collapse; }
+        table.vykony-table th, table.vykony-table td { padding: 10px 12px; text-align: center; border-bottom: 1px solid var(--border); font-size: 0.88rem; }
+        table.vykony-table th { background: #1e294b; color: var(--accent); text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.5px; }
+        table.vykony-table tr:last-child td { border-bottom: none; }
+        table.vykony-table td.pod-prumerem { color: var(--error); font-weight: 800; background: rgba(239, 68, 68, 0.08); }
+        table.vykony-table td.nad-prumerem { color: var(--success); font-weight: 600; }
+        table.vykony-table td.prazdne { color: #475569; }
+
+        .search-box { width: 100%; background: var(--card); border: 1px solid var(--border); padding: 15px; border-radius: 12px; color: white; margin-bottom: 25px; outline: none; box-sizing: border-box; font-size: 1rem; }
+        .search-box:focus { border-color: var(--accent); }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1 style="text-align: center; margin-bottom: 10px; letter-spacing: 2px;">VÝKONY OBSLUH TB</h1>
+    <p style="text-align: center; color: #64748b; margin-top: 0; margin-bottom: 30px;">Přehled odpracovaných výkonů podle dat v tabulce</p>
+
+    <div id="app">
+        <div class="login-box">
+            <h3>🔒 Zadejte heslo</h3>
+            <input type="password" id="heslo-input" placeholder="Heslo" inputmode="numeric"
+                onkeydown="if(event.key==='Enter') overitHeslo()">
+            <div class="login-error" id="heslo-error"></div>
+            <button onclick="overitHeslo()">Vstoupit</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const HESLO = '1592648';
+    const VYKONY_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRW5hUZ8pDUbqOr4nf4dWmBpuIL0mabuH91r8CsCJmyIjsPIxl0111JceVnGDqGGopnjjmGoLiMfsSV/pub?output=csv';
+    const PRUMERY_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vStALKSc7GgR1lm0zImhg7ZYpvUm5SBOqMim1tLTd9y82-8JMq31sGrtfm6vFzCzTKirxhpRIWEtGBM/pub?output=csv';
+
+    let globalVykonyData = []; // {datum, minuty, jmeno, osCislo}
+    let globalPrumery = {};    // osCislo(lower) -> {jmeno, prumer}
+
+    // --- CSV pomocné funkce ---
+    function parseCSV(text) {
+        text = text.replace(/^\uFEFF/, '');
+        const rows = [];
+        let row = [];
+        let field = '';
+        let inQuotes = false;
+        for (let i = 0; i < text.length; i++) {
+            const c = text[i];
+            if (inQuotes) {
+                if (c === '"') {
+                    if (text[i + 1] === '"') { field += '"'; i++; }
+                    else { inQuotes = false; }
+                } else { field += c; }
+            } else {
+                if (c === '"') { inQuotes = true; }
+                else if (c === ',') { row.push(field); field = ''; }
+                else if (c === '\r') { /* ignore */ }
+                else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+                else { field += c; }
+            }
+        }
+        if (field.length > 0 || row.length > 0) { row.push(field); rows.push(row); }
+        return rows.filter(r => r.length > 1 || (r.length === 1 && r[0].trim() !== ''));
+    }
+
+    function ocistitBunku(v) {
+        if (v === undefined || v === null) return '';
+        return v.replace(/\u00A0/g, ' ').trim().replace(/^'/, '').trim();
+    }
+
+    function normalizovatDatum(raw) {
+        if (!raw) return null;
+        let s = raw.trim();
+        if (!s) return null;
+        s = s.split(' ')[0];
+
+        let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+        if (m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+
+        m = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+        if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+
+        m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        if (m) return `${m[3]}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`;
+
+        const d = new Date(s);
+        if (!isNaN(d.getTime())) {
+            return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        }
+        return null;
+    }
+
+    function formatDatumCZ(iso) {
+        const m = String(iso || '').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+        if (m) return `${parseInt(m[3],10)}.${parseInt(m[2],10)}.${m[1]}`;
+        return String(iso || '');
+    }
+
+    // --- Přihlášení ---
+    function overitHeslo() {
+        const input = document.getElementById('heslo-input');
+        const errorEl = document.getElementById('heslo-error');
+        const zadane = ocistitBunku(input.value);
+
+        if (zadane === HESLO) {
+            nacistData();
+        } else {
+            errorEl.textContent = 'Nesprávné heslo. Zkuste to znovu.';
+            input.value = '';
+            input.focus();
+        }
+    }
+
+    // --- Načtení dat ---
+    async function nacistData() {
+        const app = document.getElementById('app');
+        app.innerHTML = `<div class="status-msg">Načítám data o výkonech...</div>`;
+
+        try {
+            const [vykonyText, prumeryText] = await Promise.all([
+                fetch(VYKONY_URL).then(r => r.text()),
+                fetch(PRUMERY_URL).then(r => r.text())
+            ]);
+
+            // Zpracování výkonů
+            const vykonyRows = parseCSV(vykonyText);
+            globalVykonyData = [];
+            vykonyRows.forEach(cols => {
+                const datumIso = normalizovatDatum(ocistitBunku(cols[0]));
+                const minuty = parseFloat(ocistitBunku(cols[1]).replace(',', '.'));
+                const jmeno = ocistitBunku(cols[2]);
+                const osCislo = ocistitBunku(cols[3]);
+                if (!datumIso || isNaN(minuty) || !osCislo) return;
+                globalVykonyData.push({ datum: datumIso, minuty, jmeno, osCislo });
+            });
+
+            // Zpracování průměrů
+            const prumeryRows = parseCSV(prumeryText);
+            globalPrumery = {};
+            prumeryRows.forEach((cols, idx) => {
+                const osCislo = ocistitBunku(cols[0]);
+                const jmeno = ocistitBunku(cols[1]);
+                const prumerRaw = ocistitBunku(cols[2]).replace(',', '.');
+                if (!osCislo) return;
+                if (idx === 0) {
+                    const nizke = osCislo.toLowerCase();
+                    if (nizke.includes('číslo') || nizke.includes('cislo') || nizke.includes('osob')) return;
+                }
+                const prumer = parseFloat(prumerRaw);
+                globalPrumery[osCislo.toLowerCase()] = {
+                    jmeno,
+                    prumer: isNaN(prumer) ? null : prumer
+                };
+            });
+
+            vykresliVse();
+        } catch (e) {
+            app.innerHTML = `<div class="msg red" style="display:block">Chyba při načítání dat. Zkontrolujte připojení nebo odkazy na tabulky.</div>`;
+        }
+    }
+
+    // --- Sestavení a vykreslení ---
+    function vykresliVse() {
+        const app = document.getElementById('app');
+
+        if (globalVykonyData.length === 0) {
+            app.innerHTML = `<div class="status-msg">V tabulce nejsou žádná data o výkonech.</div>`;
+            return;
+        }
+
+        // Celkový přehled za všechny osoby po dnech
+        const celkemPodleDnu = {};
+        globalVykonyData.forEach(r => {
+            celkemPodleDnu[r.datum] = (celkemPodleDnu[r.datum] || 0) + r.minuty;
+        });
+        const celkemDny = Object.keys(celkemPodleDnu).sort();
+
+        let celkemRadky = '';
+        celkemDny.forEach(datumIso => {
+            const minuty = Math.round(celkemPodleDnu[datumIso]);
+            const hodiny = (minuty / 60).toFixed(1);
+            celkemRadky += `
+                <tr>
+                    <td>${formatDatumCZ(datumIso)}</td>
+                    <td>${minuty} min</td>
+                    <td>${hodiny} h</td>
+                </tr>`;
+        });
+
+        let html = `
+            <div class="prehled-karta celkovy">
+                <div class="prehled-hlavicka">
+                    <div class="prehled-jmeno">📊 Celkový přehled — všechny osoby</div>
+                </div>
+                <table class="vykony-table">
+                    <thead><tr><th>Datum</th><th>Celkem minut</th><th>Celkem hodin</th></tr></thead>
+                    <tbody>${celkemRadky}</tbody>
+                </table>
+            </div>
+            <input type="text" class="search-box" id="hledej-pracovnika" placeholder="Hledat osobní číslo nebo jméno..." oninput="filtrovatPracovniky()">
+            <div id="pracovnici-wrap"></div>`;
+
+        app.innerHTML = html;
+
+        // Sestavení seznamu pracovníků
+        const osoby = {}; // osCislo -> [zaznamy]
+        globalVykonyData.forEach(r => {
+            if (!osoby[r.osCislo]) osoby[r.osCislo] = [];
+            osoby[r.osCislo].push(r);
+        });
+
+        const cisla = Object.keys(osoby);
+        const sPrumerem = [];
+        const bezPrumeru = [];
+
+        cisla.forEach(cislo => {
+            const info = globalPrumery[cislo.toLowerCase()];
+            if (info && info.prumer !== null && info.prumer !== undefined) sPrumerem.push(cislo);
+            else bezPrumeru.push(cislo);
+        });
+
+        // Řazení podle jména (nebo osobního čísla, není-li jméno)
+        function jmenoProRazeni(cislo) {
+            const info = globalPrumery[cislo.toLowerCase()];
+            if (info && info.jmeno) return info.jmeno;
+            const zaznam = osoby[cislo][0];
+            return zaznam ? zaznam.jmeno : cislo;
+        }
+        sPrumerem.sort((a, b) => jmenoProRazeni(a).localeCompare(jmenoProRazeni(b), 'cs'));
+        bezPrumeru.sort((a, b) => jmenoProRazeni(a).localeCompare(jmenoProRazeni(b), 'cs'));
+
+        const serazenaCisla = [...sPrumerem, ...bezPrumeru];
+
+        const wrap = document.getElementById('pracovnici-wrap');
+        wrap.innerHTML = serazenaCisla.map(cislo => vykresliPracovnika(cislo, osoby[cislo])).join('');
+    }
+
+    function vykresliPracovnika(osCislo, zaznamy) {
+        const info = globalPrumery[osCislo.toLowerCase()];
+        const jmeno = (info && info.jmeno) ? info.jmeno : (zaznamy[0] ? zaznamy[0].jmeno : '');
+        const prumer = (info && info.prumer !== null && info.prumer !== undefined) ? info.prumer : null;
+
+        // Součet minut po dnech pro tohoto pracovníka
+        const podleDnu = {};
+        zaznamy.forEach(r => {
+            podleDnu[r.datum] = (podleDnu[r.datum] || 0) + r.minuty;
+        });
+        const dny = Object.keys(podleDnu).sort();
+
+        let radky = '';
+        dny.forEach(datumIso => {
+            const minuty = Math.round(podleDnu[datumIso]);
+            let prumerBunka = '<td class="prazdne">—</td>';
+            let rozdilBunka = '<td class="prazdne">—</td>';
+
+            if (prumer !== null) {
+                const rozdilProcento = Math.round(((minuty - prumer) / prumer) * 100);
+                const podPrumerem = rozdilProcento <= -10;
+                const znamenko = rozdilProcento > 0 ? '+' : '';
+                prumerBunka = `<td>${Math.round(prumer)} min</td>`;
+                rozdilBunka = `<td class="${podPrumerem ? 'pod-prumerem' : 'nad-prumerem'}">${znamenko}${rozdilProcento}%</td>`;
+            }
+
+            radky += `
+                <tr>
+                    <td>${formatDatumCZ(datumIso)}</td>
+                    <td>${minuty} min</td>
+                    ${prumerBunka}
+                    ${rozdilBunka}
+                </tr>`;
+        });
+
+        return `
+            <div class="prehled-karta pracovnik-karta" data-hledat="${(osCislo + ' ' + jmeno).toLowerCase()}">
+                <div class="prehled-hlavicka">
+                    <div class="prehled-jmeno">👤 ${jmeno || '(bez jména)'} <span class="prehled-osc">${osCislo}</span></div>
+                    ${prumer === null ? '<span class="bez-prumeru-tag">bez průměru</span>' : ''}
+                </div>
+                <table class="vykony-table">
+                    <thead>
+                        <tr>
+                            <th>Datum</th>
+                            <th>Odpracováno</th>
+                            <th>Průměr pracovníka</th>
+                            <th>Rozdíl oproti průměru</th>
+                        </tr>
+                    </thead>
+                    <tbody>${radky}</tbody>
+                </table>
+            </div>`;
+    }
+
+    function filtrovatPracovniky() {
+        const dotaz = document.getElementById('hledej-pracovnika').value.trim().toLowerCase();
+        document.querySelectorAll('.pracovnik-karta').forEach(karta => {
+            const hledat = karta.getAttribute('data-hledat') || '';
+            karta.style.display = hledat.includes(dotaz) ? 'block' : 'none';
+        });
+    }
+</script>
+
+</body>
+</html>
