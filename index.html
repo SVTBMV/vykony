@@ -157,9 +157,9 @@
             globalVykonyData = [];
             vykonyRows.forEach(cols => {
                 const datumIso = normalizovatDatum(ocistitBunku(cols[0]));
-                const minuty = parseFloat(ocistitBunku(cols[1]).replace(',', '.'));
-                const jmeno = ocistitBunku(cols[2]);
-                const osCislo = ocistitBunku(cols[3]);
+                const minuty = parseFloat(ocistitBunku(cols[2]).replace(',', '.'));
+                const jmeno = ocistitBunku(cols[14]);
+                const osCislo = ocistitBunku(cols[15]);
                 if (!datumIso || isNaN(minuty) || !osCislo) return;
                 globalVykonyData.push({ datum: datumIso, minuty, jmeno, osCislo });
             });
