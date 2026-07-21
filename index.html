@@ -222,6 +222,12 @@
         wrap.innerHTML = dny.map(datumIso => vykresliDen(datumIso, podleDne[datumIso])).join('');
     }
 
+    function nazevDneVTydnu(iso) {
+        const dny = ['Neděle', 'Pondělí', 'Úterý', 'Středa', 'Čtvrtek', 'Pátek', 'Sobota'];
+        const d = new Date(iso + 'T00:00:00');
+        return dny[d.getDay()];
+    }
+
     function vykresliDen(datumIso, pracovniciDne) {
         const cisla = Object.keys(pracovniciDne);
 
@@ -265,7 +271,7 @@
         return `
             <div class="prehled-karta den-karta" data-den="${formatDatumCZ(datumIso).toLowerCase()}">
                 <div class="prehled-hlavicka">
-                    <div class="prehled-jmeno">📅 ${formatDatumCZ(datumIso)}</div>
+                    <div class="prehled-jmeno">📅 ${nazevDneVTydnu(datumIso)} ${formatDatumCZ(datumIso)}</div>
                 </div>
                 <div class="den-summary">
                     <div class="den-summary-card"><span class="val">${celkemMinut} min</span><span class="lbl">Celkem minut</span></div>
