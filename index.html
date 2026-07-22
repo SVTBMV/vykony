@@ -40,13 +40,12 @@
         .tyden-label { font-size: 0.72rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 10px; }
         .tyden-mrizka { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; align-items: end; }
         .tyden-den { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
-        .td-hodnota { font-size: 0.72rem; color: #94a3b8; margin-bottom: 4px; }
-        .td-sloupec-obal { width: 100%; height: 90px; display: flex; align-items: flex-end; }
+        .td-datum { font-size: 0.95rem; color: #fff; font-weight: 700; margin-bottom: 6px; text-align: center; }
+        .td-sloupec-obal { width: 100%; height: 100px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
+        .td-sloupec-hodnota { font-size: 1.05rem; color: var(--accent); font-weight: 800; margin-bottom: 6px; white-space: nowrap; }
         .td-sloupec { width: 100%; border-radius: 6px 6px 0 0; background: var(--accent); }
-        .td-sloupec.slaby { background: var(--warning); }
-        .td-sloupec.silny { background: var(--success); }
         .td-sloupec.prazdny { height: 4px !important; background: none; border: 1px dashed var(--border); }
-        .td-popisek { font-size: 0.7rem; color: #cbd5e1; margin-top: 6px; text-align: center; line-height: 1.3; }
+        .td-popisek { font-size: 0.78rem; color: #cbd5e1; font-weight: 600; margin-top: 8px; text-align: center; }
         .tyden-den.prazdny-den .td-popisek { color: #64748b; }
 
         table.vykony-table { width: 100%; border-collapse: collapse; }
@@ -332,31 +331,29 @@
             const pracovniDny = dnyTydne.filter(iso => celkemMinutPodleDne[iso] !== undefined);
             const hodinyPracovnich = pracovniDny.map(iso => celkemMinutPodleDne[iso] / 60);
             const celkemHodinTydne = hodinyPracovnich.reduce((a, b) => a + b, 0);
-            const prumerTydne = pracovniDny.length > 0 ? celkemHodinTydne / pracovniDny.length : 0;
             const maxHodinTydne = pracovniDny.length > 0 ? Math.max(...hodinyPracovnich) : 0;
 
             const sloupceHtml = dnyTydne.map((iso, idx) => {
                 if (celkemMinutPodleDne[iso] === undefined) {
                     return `
                         <div class="tyden-den prazdny-den">
-                            <div class="td-hodnota">—</div>
+                            <div class="td-datum">${formatDatumCZ(iso)}</div>
                             <div class="td-sloupec-obal"><div class="td-sloupec prazdny"></div></div>
-                            <div class="td-popisek">${dnyZkratky[idx]}<br>${formatDatumCZ(iso)}</div>
+                            <div class="td-popisek">${dnyZkratky[idx]}</div>
                         </div>`;
                 }
 
                 const hodiny = celkemMinutPodleDne[iso] / 60;
-                const rozdil = prumerTydne > 0 ? ((hodiny - prumerTydne) / prumerTydne) * 100 : 0;
-                let trida = '';
-                if (rozdil <= -10) trida = 'slaby';
-                else if (rozdil >= 10) trida = 'silny';
                 const vyskaProcent = maxHodinTydne > 0 ? Math.max((hodiny / maxHodinTydne) * 100, 4) : 4;
 
                 return `
                     <div class="tyden-den">
-                        <div class="td-hodnota">${hodiny.toFixed(1)}</div>
-                        <div class="td-sloupec-obal"><div class="td-sloupec ${trida}" style="height:${vyskaProcent}%;"></div></div>
-                        <div class="td-popisek">${dnyZkratky[idx]}<br>${formatDatumCZ(iso)}</div>
+                        <div class="td-datum">${formatDatumCZ(iso)}</div>
+                        <div class="td-sloupec-obal">
+                            <div class="td-sloupec-hodnota">${hodiny.toFixed(1)} hod.</div>
+                            <div class="td-sloupec" style="height:${vyskaProcent}%;"></div>
+                        </div>
+                        <div class="td-popisek">${dnyZkratky[idx]}</div>
                     </div>`;
             }).join('');
 
