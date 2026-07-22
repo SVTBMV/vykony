@@ -35,13 +35,19 @@
         .den-summary-card .lbl { display: block; font-size: 0.68rem; color: #94a3b8; text-transform: uppercase; margin-top: 3px; letter-spacing: 0.4px; }
 
         .tydny-karta { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 25px; }
-        .tyden-radek { display: flex; gap: 10px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 2px; }
-        .tyden-radek:last-child { margin-bottom: 0; }
-        .tyden-label { font-size: 0.72rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; }
-        .den-pilulka { background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border); border-radius: 10px; padding: 10px 6px; text-align: center; min-width: 78px; flex: 1; }
-        .den-pilulka .p-nazev { font-size: 0.68rem; color: #94a3b8; text-transform: uppercase; }
-        .den-pilulka .p-datum { font-size: 0.82rem; font-weight: 700; color: #fff; margin-top: 2px; }
-        .den-pilulka .p-hodiny { font-size: 1.05rem; font-weight: 800; color: var(--accent); margin-top: 8px; }
+        .tyden-blok { margin-bottom: 20px; }
+        .tyden-blok:last-child { margin-bottom: 0; }
+        .tyden-label { font-size: 0.72rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 10px; }
+        .tyden-mrizka { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; align-items: end; }
+        .tyden-den { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
+        .td-hodnota { font-size: 0.72rem; color: #94a3b8; margin-bottom: 4px; }
+        .td-sloupec-obal { width: 100%; height: 90px; display: flex; align-items: flex-end; }
+        .td-sloupec { width: 100%; border-radius: 6px 6px 0 0; background: var(--accent); }
+        .td-sloupec.slaby { background: var(--warning); }
+        .td-sloupec.silny { background: var(--success); }
+        .td-sloupec.prazdny { height: 4px !important; background: none; border: 1px dashed var(--border); }
+        .td-popisek { font-size: 0.7rem; color: #cbd5e1; margin-top: 6px; text-align: center; line-height: 1.3; }
+        .tyden-den.prazdny-den .td-popisek { color: #64748b; }
 
         table.vykony-table { width: 100%; border-collapse: collapse; }
         table.vykony-table th, table.vykony-table td { padding: 10px 12px; text-align: center; border-bottom: 1px solid var(--border); font-size: 0.88rem; }
@@ -289,12 +295,6 @@
         }
     }
 
-    function kratkyNazevDne(iso) {
-        const dny = ['Ne', 'Po', 'Út', 'St', 'Čt', 'Pá', 'So'];
-        const d = new Date(iso + 'T00:00:00');
-        return dny[d.getDay()];
-    }
-
     // Vrátí datum pondělí týdne, do kterého daný den spadá (formát YYYY-MM-DD)
     function pondeliTydne(iso) {
         const d = new Date(iso + 'T00:00:00');
@@ -312,40 +312,65 @@
             celkemMinutPodleDne[datumIso] = hodnoty.reduce((a, b) => a + b, 0);
         });
 
-        // Seskupit dny do týdnů (klíč = pondělí daného týdne)
-        const tydny = {}; // pondeli -> [datumIso, ...]
-        Object.keys(celkemMinutPodleDne).forEach(datumIso => {
-            const klic = pondeliTydne(datumIso);
-            if (!tydny[klic]) tydny[klic] = [];
-            tydny[klic].push(datumIso);
-        });
+        // Unikátní týdny (klíč = pondělí), ve kterých se vyskytují data
+        const tydnyMnozina = new Set();
+        Object.keys(celkemMinutPodleDne).forEach(datumIso => tydnyMnozina.add(pondeliTydne(datumIso)));
+        const serazeneTydny = [...tydnyMnozina].sort().reverse();
 
-        // Týdny od nejaktuálnějšího po nejstarší, dny uvnitř týdne chronologicky (Po -> Ne)
-        const serazeneTydny = Object.keys(tydny).sort().reverse();
+        const dnyZkratky = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'];
 
-        const radky = serazeneTydny.map(pondeli => {
-            const dnyTydne = tydny[pondeli].sort();
-            const pilulky = dnyTydne.map(datumIso => {
-                const hodiny = (celkemMinutPodleDne[datumIso] / 60).toFixed(1);
+        const tydnyHtml = serazeneTydny.map(pondeli => {
+            // Vygenerovat všech 7 dnů týdne (Po -> Ne)
+            const zaklad = new Date(pondeli + 'T00:00:00');
+            const dnyTydne = [];
+            for (let i = 0; i < 7; i++) {
+                const d = new Date(zaklad);
+                d.setDate(d.getDate() + i);
+                dnyTydne.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+            }
+
+            const pracovniDny = dnyTydne.filter(iso => celkemMinutPodleDne[iso] !== undefined);
+            const hodinyPracovnich = pracovniDny.map(iso => celkemMinutPodleDne[iso] / 60);
+            const celkemHodinTydne = hodinyPracovnich.reduce((a, b) => a + b, 0);
+            const prumerTydne = pracovniDny.length > 0 ? celkemHodinTydne / pracovniDny.length : 0;
+            const maxHodinTydne = pracovniDny.length > 0 ? Math.max(...hodinyPracovnich) : 0;
+
+            const sloupceHtml = dnyTydne.map((iso, idx) => {
+                if (celkemMinutPodleDne[iso] === undefined) {
+                    return `
+                        <div class="tyden-den prazdny-den">
+                            <div class="td-hodnota">—</div>
+                            <div class="td-sloupec-obal"><div class="td-sloupec prazdny"></div></div>
+                            <div class="td-popisek">${dnyZkratky[idx]}<br>${formatDatumCZ(iso)}</div>
+                        </div>`;
+                }
+
+                const hodiny = celkemMinutPodleDne[iso] / 60;
+                const rozdil = prumerTydne > 0 ? ((hodiny - prumerTydne) / prumerTydne) * 100 : 0;
+                let trida = '';
+                if (rozdil <= -10) trida = 'slaby';
+                else if (rozdil >= 10) trida = 'silny';
+                const vyskaProcent = maxHodinTydne > 0 ? Math.max((hodiny / maxHodinTydne) * 100, 4) : 4;
+
                 return `
-                    <div class="den-pilulka">
-                        <div class="p-nazev">${kratkyNazevDne(datumIso)}</div>
-                        <div class="p-datum">${formatDatumCZ(datumIso)}</div>
-                        <div class="p-hodiny">${hodiny} h</div>
+                    <div class="tyden-den">
+                        <div class="td-hodnota">${hodiny.toFixed(1)}</div>
+                        <div class="td-sloupec-obal"><div class="td-sloupec ${trida}" style="height:${vyskaProcent}%;"></div></div>
+                        <div class="td-popisek">${dnyZkratky[idx]}<br>${formatDatumCZ(iso)}</div>
                     </div>`;
             }).join('');
 
             return `
-                <div>
-                    <div class="tyden-label">Týden od ${formatDatumCZ(pondeli)}</div>
-                    <div class="tyden-radek">${pilulky}</div>
+                <div class="tyden-blok">
+                    <div class="tyden-label">Týden od ${formatDatumCZ(pondeli)} &nbsp;•&nbsp; celkem ${celkemHodinTydne.toFixed(1)} h</div>
+                    <div class="tyden-mrizka">${sloupceHtml}</div>
                 </div>`;
         }).join('');
 
         return `
             <div class="tydny-karta">
                 <div class="prehled-jmeno" style="margin-bottom:16px;">🗓️ Přehled po týdnech</div>
-                ${radky}
+                ${tydnyHtml}
             </div>`;
     }
 
