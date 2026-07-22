@@ -35,18 +35,19 @@
         .den-summary-card .lbl { display: block; font-size: 0.68rem; color: #94a3b8; text-transform: uppercase; margin-top: 3px; letter-spacing: 0.4px; }
 
         .tydny-karta { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 25px; }
-        .tyden-blok { margin-bottom: 20px; }
+        .tyden-blok { background: rgba(56, 189, 248, 0.06); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
         .tyden-blok:last-child { margin-bottom: 0; }
-        .tyden-label { font-size: 0.72rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 10px; }
+        .tyden-nazev { font-size: 1.05rem; color: var(--accent); font-weight: 800; }
+        .tyden-stats { font-size: 0.85rem; color: #cbd5e1; font-weight: 600; margin-top: 3px; margin-bottom: 14px; }
         .tyden-mrizka { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; align-items: end; }
         .tyden-den { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
-        .td-datum { font-size: 0.95rem; color: #fff; font-weight: 700; margin-bottom: 6px; text-align: center; }
-        .td-sloupec-obal { width: 100%; height: 100px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
-        .td-sloupec-hodnota { font-size: 1.05rem; color: var(--accent); font-weight: 800; margin-bottom: 6px; white-space: nowrap; }
+        .td-den-nazev { font-size: 0.78rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; }
+        .td-datum { font-size: 0.85rem; color: #fff; font-weight: 700; margin-top: 2px; text-align: center; }
+        .td-hodnota-radek { font-size: 0.95rem; color: var(--accent); font-weight: 800; margin-top: 4px; margin-bottom: 8px; white-space: nowrap; }
+        .td-sloupec-obal { width: 100%; height: 80px; display: flex; align-items: flex-end; }
         .td-sloupec { width: 100%; border-radius: 6px 6px 0 0; background: var(--accent); }
         .td-sloupec.prazdny { height: 4px !important; background: none; border: 1px dashed var(--border); }
-        .td-popisek { font-size: 0.78rem; color: #cbd5e1; font-weight: 600; margin-top: 8px; text-align: center; }
-        .tyden-den.prazdny-den .td-popisek { color: #64748b; }
+        .tyden-den.prazdny-den .td-datum, .tyden-den.prazdny-den .td-den-nazev { color: #64748b; }
 
         table.vykony-table { width: 100%; border-collapse: collapse; }
         table.vykony-table th, table.vykony-table td { padding: 10px 12px; text-align: center; border-bottom: 1px solid var(--border); font-size: 0.88rem; }
@@ -331,15 +332,17 @@
             const pracovniDny = dnyTydne.filter(iso => celkemMinutPodleDne[iso] !== undefined);
             const hodinyPracovnich = pracovniDny.map(iso => celkemMinutPodleDne[iso] / 60);
             const celkemHodinTydne = hodinyPracovnich.reduce((a, b) => a + b, 0);
+            const prumerTydne = pracovniDny.length > 0 ? celkemHodinTydne / pracovniDny.length : 0;
             const maxHodinTydne = pracovniDny.length > 0 ? Math.max(...hodinyPracovnich) : 0;
 
             const sloupceHtml = dnyTydne.map((iso, idx) => {
                 if (celkemMinutPodleDne[iso] === undefined) {
                     return `
                         <div class="tyden-den prazdny-den">
+                            <div class="td-den-nazev">${dnyZkratky[idx]}</div>
                             <div class="td-datum">${formatDatumCZ(iso)}</div>
+                            <div class="td-hodnota-radek">—</div>
                             <div class="td-sloupec-obal"><div class="td-sloupec prazdny"></div></div>
-                            <div class="td-popisek">${dnyZkratky[idx]}</div>
                         </div>`;
                 }
 
@@ -348,18 +351,17 @@
 
                 return `
                     <div class="tyden-den">
+                        <div class="td-den-nazev">${dnyZkratky[idx]}</div>
                         <div class="td-datum">${formatDatumCZ(iso)}</div>
-                        <div class="td-sloupec-obal">
-                            <div class="td-sloupec-hodnota">${hodiny.toFixed(1)} hod.</div>
-                            <div class="td-sloupec" style="height:${vyskaProcent}%;"></div>
-                        </div>
-                        <div class="td-popisek">${dnyZkratky[idx]}</div>
+                        <div class="td-hodnota-radek">${hodiny.toFixed(1)} hod.</div>
+                        <div class="td-sloupec-obal"><div class="td-sloupec" style="height:${vyskaProcent}%;"></div></div>
                     </div>`;
             }).join('');
 
             return `
                 <div class="tyden-blok">
-                    <div class="tyden-label">Týden od ${formatDatumCZ(pondeli)} &nbsp;•&nbsp; celkem ${celkemHodinTydne.toFixed(1)} h</div>
+                    <div class="tyden-nazev">Týden od ${formatDatumCZ(pondeli)}</div>
+                    <div class="tyden-stats">Celkem ${celkemHodinTydne.toFixed(1)} hod. &nbsp;•&nbsp; Průměr ${prumerTydne.toFixed(1)} hod./den</div>
                     <div class="tyden-mrizka">${sloupceHtml}</div>
                 </div>`;
         }).join('');
