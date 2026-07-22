@@ -332,7 +332,7 @@
             const pracovniDny = dnyTydne.filter(iso => celkemMinutPodleDne[iso] !== undefined);
             const hodinyPracovnich = pracovniDny.map(iso => celkemMinutPodleDne[iso] / 60);
             const celkemHodinTydne = hodinyPracovnich.reduce((a, b) => a + b, 0);
-            const prumerTydne = pracovniDny.length > 0 ? celkemHodinTydne / pracovniDny.length : 0;
+            const prumerTydne = celkemHodinTydne / 5;
             const maxHodinTydne = pracovniDny.length > 0 ? Math.max(...hodinyPracovnich) : 0;
 
             const sloupceHtml = dnyTydne.map((iso, idx) => {
