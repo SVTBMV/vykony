@@ -67,6 +67,21 @@
         .search-box { width: 100%; background: var(--card); border: 1px solid var(--border); padding: 15px; border-radius: 12px; color: white; margin-bottom: 25px; outline: none; box-sizing: border-box; font-size: 1rem; }
         .search-box:focus { border-color: var(--accent); }
 
+        /* --- Rozcestník středisek --- */
+        .rozcestnik-nadpis { text-align: center; font-size: 1.1rem; font-weight: 800; color: var(--accent); margin-bottom: 18px; letter-spacing: 1px; text-transform: uppercase; }
+        .strediska-mrizka { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+        .stredisko-karta { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px 14px; text-align: center; cursor: pointer; transition: border-color .15s, transform .15s; font: inherit; color: inherit; }
+        .stredisko-karta:hover, .stredisko-karta:active { border-color: var(--accent); transform: translateY(-2px); }
+        .stredisko-karta .s-popis { display: block; font-size: 0.68rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; }
+        .stredisko-karta .s-cislo { display: block; font-size: 2.2rem; font-weight: 800; color: var(--accent); margin: 4px 0 8px; }
+        .stredisko-karta .s-info { display: block; font-size: 0.8rem; color: #cbd5e1; line-height: 1.5; }
+        .stredisko-karta.vse .s-cislo { font-size: 1.4rem; margin: 14px 0; }
+
+        .zpet-lista { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+        .zpet-btn { background: var(--card); border: 1px solid var(--accent); color: var(--accent); font-weight: 700; padding: 10px 16px; border-radius: 10px; cursor: pointer; font-size: 0.95rem; }
+        .zpet-btn:hover, .zpet-btn:active { background: rgba(56, 189, 248, 0.12); }
+        .zpet-titul { font-size: 1.2rem; font-weight: 800; color: #fff; }
+
         /* ===== TABLET ===== */
         @media (max-width: 720px) {
             body { padding: 12px; }
@@ -98,6 +113,12 @@
             .td-hodnota-radek .jednotka { display: none; }
             .td-sloupec-obal { height: 64px; }
             .td-sloupec { border-radius: 4px 4px 0 0; }
+
+            .strediska-mrizka { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+            .stredisko-karta { padding: 16px 8px; }
+            .stredisko-karta .s-cislo { font-size: 1.9rem; }
+            .zpet-btn { padding: 12px 14px; }
+            .zpet-titul { font-size: 1.05rem; }
 
             .search-box { padding: 13px; font-size: 16px; margin-bottom: 16px; }
             .detekce-info { font-size: 0.68rem; margin-bottom: 12px; }
@@ -158,6 +179,73 @@
     let globalVykonyData = []; // {datum, minuty, jmeno, osCislo}
     let globalPrumery = {};    // osCislo(lower) -> {jmeno, prumer}
     let globalDetekceInfo = { vykony: null, prumery: null }; // pro zobrazení info o rozpoznaných sloupcích
+    let globalStrediska = []; // seznam klíčů středisek pro rozcestník
+
+    const IDX_STREDISKO = 36; // sloupec AK
+
+    // Sjednotí zápis střediska: "2" i "02" -> "02"
+    function normStredisko(raw) {
+        const s = ocistitBunku(raw);
+        if (!s) return '';
+        if (/^\d+$/.test(s)) return String(parseInt(s, 10)).padStart(2, '0');
+        return s;
+    }
+
+    function popisStrediska(klic) {
+        return klic === '' ? 'Bez střediska' : klic;
+    }
+
+    // --- Rozcestník středisek ---
+    function zobrazRozcestnik() {
+        const app = document.getElementById('app');
+        window.scrollTo(0, 0);
+
+        if (globalVykonyData.length === 0) {
+            app.innerHTML = `<div class="status-msg">V tabulce nejsou žádná data o výkonech.</div>`;
+            return;
+        }
+
+        const skupiny = {}; // klíč -> {lide:Set, zaznamy, posledni}
+        globalVykonyData.forEach(r => {
+            const k = r.stredisko;
+            if (!skupiny[k]) skupiny[k] = { lide: new Set(), zaznamy: 0, posledni: '' };
+            skupiny[k].lide.add(r.osCislo);
+            skupiny[k].zaznamy++;
+            if (r.datum > skupiny[k].posledni) skupiny[k].posledni = r.datum;
+        });
+
+        globalStrediska = Object.keys(skupiny).sort((a, b) => {
+            if (a === '') return 1;
+            if (b === '') return -1;
+            return a.localeCompare(b, 'cs', { numeric: true });
+        });
+
+        const kartyHtml = globalStrediska.map((k, i) => {
+            const s = skupiny[k];
+            return `
+                <button class="stredisko-karta" onclick="otevritStredisko(${i})">
+                    <span class="s-popis">Středisko</span>
+                    <span class="s-cislo">${k === '' ? '—' : k}</span>
+                    <span class="s-info">${k === '' ? 'Bez střediska<br>' : ''}${s.lide.size} pracovníků<br>poslední záznam ${formatDatumCZ(s.posledni)}</span>
+                </button>`;
+        }).join('');
+
+        app.innerHTML = `
+            <div class="rozcestnik-nadpis">Vyberte středisko</div>
+            <div class="strediska-mrizka">
+                ${kartyHtml}
+                <button class="stredisko-karta vse" onclick="otevritStredisko(-1)">
+                    <span class="s-popis">Zobrazit</span>
+                    <span class="s-cislo">VŠECHNA</span>
+                    <span class="s-info">${new Set(globalVykonyData.map(r => r.osCislo)).size} pracovníků</span>
+                </button>
+            </div>`;
+    }
+
+    function otevritStredisko(index) {
+        if (index === -1) { vykresliVse(null); return; }
+        vykresliVse(globalStrediska[index]);
+    }
 
     function indexNaPismeno(idx) {
         return String.fromCharCode(65 + idx);
@@ -329,7 +417,8 @@
                 const jmeno = ocistitBunku(cols[vykonyIdx.idxJmeno]);
                 const osCislo = ocistitBunku(cols[vykonyIdx.idxOsCislo]);
                 if (!datumIso || isNaN(minuty) || !osCislo) return;
-                globalVykonyData.push({ datum: datumIso, minuty, jmeno, osCislo });
+                const stredisko = normStredisko(cols[IDX_STREDISKO]);
+                globalVykonyData.push({ datum: datumIso, minuty, jmeno, osCislo, stredisko });
             });
 
             // Zpracování průměrů
@@ -368,7 +457,7 @@
                 };
             });
 
-            vykresliVse();
+            zobrazRozcestnik();
         } catch (e) {
             app.innerHTML = `<div class="msg red" style="display:block">Chyba při načítání dat. Zkontrolujte připojení nebo odkazy na tabulky.</div>`;
         }
@@ -471,24 +560,38 @@
     }
 
     // --- Sestavení a vykreslení ---
-    function vykresliVse() {
+    function vykresliVse(strediskoKlic) {
         const app = document.getElementById('app');
+        window.scrollTo(0, 0);
 
-        if (globalVykonyData.length === 0) {
-            app.innerHTML = `<div class="status-msg">V tabulce nejsou žádná data o výkonech.</div>`;
+        const data = (strediskoKlic === null || strediskoKlic === undefined)
+            ? globalVykonyData
+            : globalVykonyData.filter(r => r.stredisko === strediskoKlic);
+        const titul = (strediskoKlic === null || strediskoKlic === undefined)
+            ? 'Všechna střediska'
+            : (strediskoKlic === '' ? 'Bez střediska' : `Středisko ${strediskoKlic}`);
+
+        const zpetHtml = `
+            <div class="zpet-lista">
+                <button class="zpet-btn" onclick="zobrazRozcestnik()">← Střediska</button>
+                <div class="zpet-titul">${titul}</div>
+            </div>`;
+
+        if (data.length === 0) {
+            app.innerHTML = zpetHtml + `<div class="status-msg">V tabulce nejsou žádná data o výkonech.</div>`;
             return;
         }
 
         // Seskupit záznamy podle dne, a v rámci dne podle osobního čísla (součet minut)
         const podleDne = {}; // datum -> { osCislo -> {jmeno, minuty} }
-        globalVykonyData.forEach(r => {
+        data.forEach(r => {
             if (!podleDne[r.datum]) podleDne[r.datum] = {};
             if (!podleDne[r.datum][r.osCislo]) podleDne[r.datum][r.osCislo] = { jmeno: r.jmeno, minuty: 0 };
             podleDne[r.datum][r.osCislo].minuty += r.minuty;
             if (!podleDne[r.datum][r.osCislo].jmeno && r.jmeno) podleDne[r.datum][r.osCislo].jmeno = r.jmeno;
         });
 
-        app.innerHTML = `
+        app.innerHTML = zpetHtml + `
             <div class="detekce-info">${sestavitTextDetekce()}</div>
             ${vykresliTydenniPrehled(podleDne)}
             <input type="text" class="search-box" id="hledej-pracovnika" placeholder="Hledat osobní číslo, jméno nebo datum..." oninput="filtrovatRadky()">
