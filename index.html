@@ -180,6 +180,7 @@
     let globalPrumery = {};    // osCislo(lower) -> {jmeno, prumer}
     let globalDetekceInfo = { vykony: null, prumery: null }; // pro zobrazení info o rozpoznaných sloupcích
     let globalStrediska = []; // seznam klíčů středisek pro rozcestník
+    let globalPrumeryJmeno = {}; // průměry podle jména (pro lidi bez osobního čísla)
 
     const IDX_STREDISKO = 36; // sloupec AK
 
@@ -415,7 +416,8 @@
                 const datumIso = normalizovatDatum(ocistitBunku(cols[vykonyIdx.idxDatum]));
                 const minuty = parseFloat(ocistitBunku(cols[vykonyIdx.idxCas]).replace(',', '.'));
                 const jmeno = ocistitBunku(cols[vykonyIdx.idxJmeno]);
-                const osCislo = ocistitBunku(cols[vykonyIdx.idxOsCislo]);
+                let osCislo = ocistitBunku(cols[vykonyIdx.idxOsCislo]);
+                if (!osCislo) osCislo = jmeno; // někteří (např. středisko 50) nemají osobní číslo -> použít jméno
                 if (!datumIso || isNaN(minuty) || !osCislo) return;
                 const stredisko = normStredisko(cols[IDX_STREDISKO]);
                 globalVykonyData.push({ datum: datumIso, minuty, jmeno, osCislo, stredisko });
@@ -424,6 +426,7 @@
             // Zpracování průměrů
             const prumeryRows = parseCSV(prumeryText);
             globalPrumery = {};
+            globalPrumeryJmeno = {};
 
             let prumeryDetekce = null;
             let prumeryDataRows = prumeryRows;
@@ -455,6 +458,7 @@
                     jmeno,
                     prumer: isNaN(prumer) ? null : prumer
                 };
+                if (jmeno) globalPrumeryJmeno[jmeno.toLowerCase()] = globalPrumery[osCislo.toLowerCase()];
             });
 
             zobrazRozcestnik();
@@ -627,8 +631,9 @@
         serazenaCisla.forEach(osCislo => {
             const zaznam = pracovniciDne[osCislo];
             const minuty = Math.round(zaznam.minuty);
-            const info = globalPrumery[osCislo.toLowerCase()];
+            const info = globalPrumery[osCislo.toLowerCase()] || globalPrumeryJmeno[(zaznam.jmeno || '').toLowerCase()];
             const jmeno = (info && info.jmeno) ? info.jmeno : (zaznam.jmeno || '');
+            const zobrazOsc = (jmeno && osCislo.toLowerCase() === jmeno.toLowerCase()) ? '' : osCislo;
             const prumer = (info && info.prumer !== null && info.prumer !== undefined) ? info.prumer : null;
             const podil = celkemMinut > 0 ? Math.round((minuty / celkemMinut) * 100) : 0;
 
@@ -642,7 +647,7 @@
 
             radky += `
                 <tr data-hledat="${(osCislo + ' ' + jmeno + ' ' + formatDatumCZ(datumIso)).toLowerCase()}">
-                    <td class="td-jmeno" style="text-align:left;" data-label="Jméno">${jmeno || '(bez jména)'} <span class="prehled-osc">${osCislo}</span></td>
+                    <td class="td-jmeno" style="text-align:left;" data-label="Jméno">${jmeno || '(bez jména)'} ${zobrazOsc ? `<span class="prehled-osc">${zobrazOsc}</span>` : ''}</td>
                     <td data-label="Odpracováno">${minuty} min</td>
                     <td data-label="Jejich průměr">${prumer !== null ? Math.round(prumer) + ' min' : '<span class="prazdne">—</span>'}</td>
                     ${rozdilBunka}
