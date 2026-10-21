@@ -8,8 +8,12 @@
         :root {
             --bg: #0f172a; --card: #1e293b; --accent: #38bdf8; --text: #f1f5f9; --success: #22c55e; --error: #ef4444; --warning: #eab308; --border: #334155;
         }
+        * { -webkit-tap-highlight-color: transparent; }
+        html { -webkit-text-size-adjust: 100%; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
         .container { max-width: 1000px; margin: 0 auto; }
+        h1.nadpis { text-align: center; margin-bottom: 10px; letter-spacing: 2px; }
+        p.podnadpis { text-align: center; color: #64748b; margin-top: 0; margin-bottom: 30px; }
 
         .status-msg { text-align: center; color: var(--accent); font-style: italic; margin-top: 20px; }
         .msg { padding: 12px; border-radius: 6px; font-size: 0.9rem; font-weight: 500; line-height: 1.4; display: none; }
@@ -22,6 +26,8 @@
         .login-box button { width: 100%; background: var(--accent); color: #000; font-weight: bold; border: none; padding: 14px; border-radius: 8px; cursor: pointer; font-size: 1rem; }
         .login-box button:hover { opacity: 0.9; }
         .login-error { color: var(--error); font-size: 0.85rem; margin-top: -5px; margin-bottom: 15px; min-height: 1em; }
+
+        .detekce-info { font-size: 0.78rem; color: #64748b; margin-bottom: 16px; text-align: center; line-height: 1.5; }
 
         .prehled-karta { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 20px; }
         .prehled-hlavicka { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
@@ -40,9 +46,10 @@
         .tyden-nazev { font-size: 1.05rem; color: var(--accent); font-weight: 800; }
         .tyden-stats { font-size: 0.85rem; color: #cbd5e1; font-weight: 600; margin-top: 3px; margin-bottom: 14px; }
         .tyden-mrizka { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; align-items: end; }
-        .tyden-den { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
+        .tyden-den { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; min-width: 0; }
         .td-den-nazev { font-size: 0.78rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; }
         .td-datum { font-size: 0.85rem; color: #fff; font-weight: 700; margin-top: 2px; text-align: center; }
+        .td-datum .kratke { display: none; }
         .td-hodnota-radek { font-size: 0.95rem; color: var(--accent); font-weight: 800; margin-top: 4px; margin-bottom: 8px; white-space: nowrap; }
         .td-sloupec-obal { width: 100%; height: 80px; display: flex; align-items: flex-end; }
         .td-sloupec { width: 100%; border-radius: 6px 6px 0 0; background: var(--accent); }
@@ -59,13 +66,78 @@
 
         .search-box { width: 100%; background: var(--card); border: 1px solid var(--border); padding: 15px; border-radius: 12px; color: white; margin-bottom: 25px; outline: none; box-sizing: border-box; font-size: 1rem; }
         .search-box:focus { border-color: var(--accent); }
+
+        /* ===== TABLET ===== */
+        @media (max-width: 720px) {
+            body { padding: 12px; }
+            h1.nadpis { font-size: 1.35rem; letter-spacing: 1px; }
+            p.podnadpis { font-size: 0.85rem; margin-bottom: 18px; }
+
+            .login-box { margin: 30px auto; padding: 24px 20px; }
+            .login-box input { font-size: 16px; } /* zabrání přiblížení na iOS */
+
+            .prehled-karta, .tydny-karta { padding: 14px; border-radius: 12px; margin-bottom: 14px; }
+            .prehled-jmeno { font-size: 1.02rem; }
+
+            .den-summary { grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 14px; }
+            .den-summary-card { padding: 10px 6px; }
+            .den-summary-card .val { font-size: 1.1rem; }
+            .den-summary-card .lbl { font-size: 0.62rem; }
+            /* poslední (5.) karta přes celou šířku */
+            .den-summary-card:last-child:nth-child(odd) { grid-column: 1 / -1; }
+
+            .tyden-blok { padding: 12px 10px; }
+            .tyden-nazev { font-size: 0.95rem; }
+            .tyden-stats { font-size: 0.78rem; margin-bottom: 10px; }
+            .tyden-mrizka { gap: 4px; }
+            .td-den-nazev { font-size: 0.68rem; }
+            .td-datum { font-size: 0.66rem; }
+            .td-datum .plne { display: none; }
+            .td-datum .kratke { display: inline; }
+            .td-hodnota-radek { font-size: 0.72rem; margin-bottom: 6px; }
+            .td-hodnota-radek .jednotka { display: none; }
+            .td-sloupec-obal { height: 64px; }
+            .td-sloupec { border-radius: 4px 4px 0 0; }
+
+            .search-box { padding: 13px; font-size: 16px; margin-bottom: 16px; }
+            .detekce-info { font-size: 0.68rem; margin-bottom: 12px; }
+
+            /* tabulka -> karty */
+            table.vykony-table, table.vykony-table tbody { display: block; width: 100%; }
+            table.vykony-table thead { display: none; }
+            table.vykony-table tr {
+                display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px;
+                padding: 12px 4px; border-bottom: 1px solid var(--border);
+            }
+            table.vykony-table tr:last-child { border-bottom: none; }
+            table.vykony-table td {
+                display: flex; flex-direction: column; align-items: flex-start;
+                padding: 4px 8px; border: none; text-align: left; font-size: 0.95rem;
+                border-radius: 6px;
+            }
+            table.vykony-table td::before {
+                content: attr(data-label); font-size: 0.62rem; color: #94a3b8;
+                text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 2px; font-weight: 600;
+            }
+            table.vykony-table td.td-jmeno { grid-column: 1 / -1; font-size: 1.02rem; font-weight: 700; }
+            table.vykony-table td.td-jmeno::before { display: none; }
+            table.vykony-table td.td-jmeno .prehled-osc { margin-left: 0; display: block; margin-top: 2px; }
+        }
+
+        /* ===== MALÉ TELEFONY ===== */
+        @media (max-width: 380px) {
+            .tyden-mrizka { gap: 2px; }
+            .td-datum { font-size: 0.6rem; }
+            .td-hodnota-radek { font-size: 0.66rem; }
+            .tyden-blok { padding: 10px 6px; }
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1 style="text-align: center; margin-bottom: 10px; letter-spacing: 2px;">VÝKONY OBSLUH TB</h1>
-    <p style="text-align: center; color: #64748b; margin-top: 0; margin-bottom: 30px;">Přehled odpracovaných výkonů podle dat v tabulce</p>
+    <h1 class="nadpis">VÝKONY OBSLUH TB</h1>
+    <p class="podnadpis">Přehled odpracovaných výkonů podle dat v tabulce</p>
 
     <div id="app">
         <div class="login-box">
@@ -147,6 +219,13 @@
     function formatDatumCZ(iso) {
         const m = String(iso || '').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
         if (m) return `${parseInt(m[3],10)}.${parseInt(m[2],10)}.${m[1]}`;
+        return String(iso || '');
+    }
+
+    // Krátké datum bez roku (pro mobil)
+    function formatDatumKratce(iso) {
+        const m = String(iso || '').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+        if (m) return `${parseInt(m[3],10)}.${parseInt(m[2],10)}.`;
         return String(iso || '');
     }
 
@@ -335,12 +414,14 @@
             const prumerTydne = celkemHodinTydne / 5;
             const maxHodinTydne = pracovniDny.length > 0 ? Math.max(...hodinyPracovnich) : 0;
 
+            const datumHtml = (iso) => `<span class="plne">${formatDatumCZ(iso)}</span><span class="kratke">${formatDatumKratce(iso)}</span>`;
+
             const sloupceHtml = dnyTydne.map((iso, idx) => {
                 if (celkemMinutPodleDne[iso] === undefined) {
                     return `
                         <div class="tyden-den prazdny-den">
                             <div class="td-den-nazev">${dnyZkratky[idx]}</div>
-                            <div class="td-datum">${formatDatumCZ(iso)}</div>
+                            <div class="td-datum">${datumHtml(iso)}</div>
                             <div class="td-hodnota-radek">—</div>
                             <div class="td-sloupec-obal"><div class="td-sloupec prazdny"></div></div>
                         </div>`;
@@ -352,8 +433,8 @@
                 return `
                     <div class="tyden-den">
                         <div class="td-den-nazev">${dnyZkratky[idx]}</div>
-                        <div class="td-datum">${formatDatumCZ(iso)}</div>
-                        <div class="td-hodnota-radek">${hodiny.toFixed(1)} hod.</div>
+                        <div class="td-datum">${datumHtml(iso)}</div>
+                        <div class="td-hodnota-radek">${hodiny.toFixed(1)}<span class="jednotka"> hod.</span></div>
                         <div class="td-sloupec-obal"><div class="td-sloupec" style="height:${vyskaProcent}%;"></div></div>
                     </div>`;
             }).join('');
@@ -408,7 +489,7 @@
         });
 
         app.innerHTML = `
-            <div style="font-size:0.78rem; color:#64748b; margin-bottom:16px; text-align:center;">${sestavitTextDetekce()}</div>
+            <div class="detekce-info">${sestavitTextDetekce()}</div>
             ${vykresliTydenniPrehled(podleDne)}
             <input type="text" class="search-box" id="hledej-pracovnika" placeholder="Hledat osobní číslo, jméno nebo datum..." oninput="filtrovatRadky()">
             <div id="dny-wrap"></div>`;
@@ -448,21 +529,21 @@
             const prumer = (info && info.prumer !== null && info.prumer !== undefined) ? info.prumer : null;
             const podil = celkemMinut > 0 ? Math.round((minuty / celkemMinut) * 100) : 0;
 
-            let rozdilBunka = '<td class="prazdne">—</td>';
+            let rozdilBunka = '<td class="prazdne" data-label="Rozdíl oproti průměru">—</td>';
             if (prumer !== null) {
                 const rozdilProcento = Math.round(((minuty - prumer) / prumer) * 100);
                 const podPrumerem = rozdilProcento <= -10;
                 const znamenko = rozdilProcento > 0 ? '+' : '';
-                rozdilBunka = `<td class="${podPrumerem ? 'pod-prumerem' : 'nad-prumerem'}">${znamenko}${rozdilProcento}%</td>`;
+                rozdilBunka = `<td class="${podPrumerem ? 'pod-prumerem' : 'nad-prumerem'}" data-label="Rozdíl oproti průměru">${znamenko}${rozdilProcento}%</td>`;
             }
 
             radky += `
                 <tr data-hledat="${(osCislo + ' ' + jmeno + ' ' + formatDatumCZ(datumIso)).toLowerCase()}">
-                    <td style="text-align:left;">${jmeno || '(bez jména)'} <span class="prehled-osc">${osCislo}</span></td>
-                    <td>${minuty} min</td>
-                    <td>${prumer !== null ? Math.round(prumer) + ' min' : '<span class="prazdne">—</span>'}</td>
+                    <td class="td-jmeno" style="text-align:left;" data-label="Jméno">${jmeno || '(bez jména)'} <span class="prehled-osc">${osCislo}</span></td>
+                    <td data-label="Odpracováno">${minuty} min</td>
+                    <td data-label="Jejich průměr">${prumer !== null ? Math.round(prumer) + ' min' : '<span class="prazdne">—</span>'}</td>
                     ${rozdilBunka}
-                    <td>${podil}%</td>
+                    <td data-label="Podíl na dni">${podil}%</td>
                 </tr>`;
         });
 
